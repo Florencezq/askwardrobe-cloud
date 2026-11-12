@@ -1,0 +1,14 @@
+[hidden] { display: none !important; }
+#page { padding-top: 24px; }
+#auth { padding-top: min(9vh, 72px); }
+#auth h1, #profile h1, #wardrobe h1 { font-size: 27px; }
+#auth p, #empty, #status { line-height: 1.55; color: #586071; }
+#auth p { margin: 10px 0 26px; }
+#auth .minor { display: block; margin: 12px auto; }
+.section-top, .pager { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+#empty { text-align: center; margin: 18vh auto; }
+#status { margin-top: 15px; overflow-wrap: anywhere; }
+#nav button { width: 50%; min-height: 40px; font-size: 15px; align-items: center; }
+#profile .line { overflow-wrap: anywhere; gap: 10px; }
+#preview { padding: 30px 16px 16px; }
+#preview img { width: 100%; max-height: 72svh; object-fit: contain; }
