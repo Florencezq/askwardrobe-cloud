@@ -943,3 +943,5 @@ html {
 .account-form .import-option {display: flex; align-items: flex-start; gap: 8px; font-size: 14px}
 .auth-error {color: #a42525; margin: 0}
 .auth-error:empty {display: none}
+
+.cloud-link { text-decoration: none; margin: 8px 0; }

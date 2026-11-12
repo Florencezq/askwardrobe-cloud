@@ -1,51 +1,32 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="referrer" content="no-referrer">
-  <title>我的衣橱</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="cloud.css">
-  <script defer src="supabase.js"></script>
-  <script defer src="config.js"></script>
-  <script defer src="wardrobe.js"></script>
-</head>
-<body>
-<div id="shell">
-  <header id="header"><span class="brand" lang="en"><small>My</small>Wardrobe</span></header>
-  <main id="page">
-    <section id="auth" hidden>
-      <h1 id="auth-title">登录我的衣橱</h1>
-      <p>用同一个账号，在手机和电脑上查看衣物。</p>
-      <form id="account-form" class="account-form">
-        <label>邮箱<input class="text-input" name="email" type="email" required maxlength="254" autocomplete="username"></label>
-        <label>密码<input class="text-input" name="password" type="password" required maxlength="128" autocomplete="current-password"></label>
-        <button class="primary" id="submit-auth">登录</button>
-      </form>
-      <button class="minor" id="switch-auth">还没有账号？去注册</button>
-    </section>
-    <section id="wardrobe" hidden>
-      <div class="section-top"><h1>我的衣物</h1><button id="upload" class="primary">上传衣物图</button></div>
-      <input type="file" accept="image/jpeg,image/png,image/webp" id="file" hidden>
-      <div class="grid" id="garments" aria-label="衣物列表"></div>
-      <p id="empty" hidden>还没有衣物，上传第一张衣物图吧。</p>
-      <div class="pager">
-        <button class="secondary" id="previous" hidden>上一页</button>
-        <button class="secondary" id="next" hidden>下一页</button>
-      </div>
-    </section>
-    <section id="profile" hidden>
-      <h1>我的账号</h1><div class="line">登录邮箱<span id="email"></span></div>
-      <button class="line" id="logout">退出登录</button>
-    </section>
-    <p id="status" role="status" aria-live="polite">正在打开衣橱…</p>
-    <button class="minor" id="retry" hidden>重试</button>
-  </main>
-  <nav id="nav" aria-label="主导航" hidden>
-    <button id="nav-wardrobe">衣橱</button><button id="nav-profile">我的</button>
-  </nav>
-</div>
-<dialog id="preview"><button class="close" aria-label="关闭">×</button><img alt="衣物大图"></dialog>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#ffffff" />
+    <title>虚拟试穿 · 我的衣橱</title>
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="supabase.js"></script>
+    <script defer src="config.js"></script>
+    <script defer src="wardrobe.js?v=5dad747bb2cd"></script>
+    <script defer src="app.js?v=755a4a1b921a"></script>
+  </head>
+  <body>
+    <div id="shell">
+      <header id="header"></header>
+      <main id="page"></main>
+      <nav id="nav" aria-label="主导航"></nav>
+    </div>
+    <dialog id="sheet"></dialog>
+    <div id="notice" role="status"></div>
+    <input
+      id="file"
+      hidden
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+    />
+  </body>
 </html>
