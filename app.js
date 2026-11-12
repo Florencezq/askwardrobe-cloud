@@ -485,15 +485,31 @@ function detailView(it) {
     "</section>"
   );
 }
+function wardrobeEmpty() {
+  const upload = cloud && (filter === "All" || filter === "Uploads");
+  const generator = filter === "Generator";
+  const sample = upload ? "jacket" : generator ? "suit" : "street";
+  const title = upload ? "添加第一件衣物" : generator ? "还没有生成的穿搭" :
+    filter === "Uploads" ? "还没有保存的素材" : "还没有试穿造型";
+  const hint = upload ? "上传一张单件衣物照，就能在手机和电脑上查看。" :
+    generator ? "选一张人物照，再挑一种喜欢的风格。" : "选好人物照和想穿的衣物，就可以开始试穿。";
+  return '<section class="empty wardrobe-empty"><figure class="wardrobe-example">' +
+    img(asset(sample), "", "example-photo") + '<figcaption>示例</figcaption></figure>' +
+    '<div class="wardrobe-intro"><h1>' + title + '</h1><p>' + hint + '</p>' +
+    button(upload ? "上传衣物图" : generator ? "选择穿搭风格" : "去试穿",
+      upload ? "cloud-upload" : generator ? "nav:2" : "nav:3", "primary") +
+    '</div></section>';
+}
 function wardrobeView() {
   let list = db.items.filter((i) => filter === "All" || i.type === filter);
   return (
-    '<div class="seg" role="group" aria-label="衣橱分类">' +
+    '<section class="wardrobe-home"><div class="seg" role="group" aria-label="衣橱分类">' +
     ["All", "Try On", "Generator", "Uploads"]
       .map((f) => button(labels[f], "filter:" + f, f === filter ? "chosen" : "", 'aria-pressed="' + (f === filter) + '"'))
       .join("") +
     "</div>" +
-    (cloud ? button("上传衣物图", "cloud-upload", "secondary wide") : "") +
+    (cloud && list.length && ["All","Uploads"].includes(filter)
+      ? '<div class="wardrobe-tools">' + button("上传衣物图", "cloud-upload", "secondary") + '</div>' : "") +
     (db.job ? button("正在生成造型…", "resume", "pending") : "") +
     (list.length
       ? '<div class="grid">' +
@@ -513,17 +529,7 @@ function wardrobeView() {
           )
           .join("") +
         "</div>"
-      : '<div class="empty"><p>' +
-        (filter === "Uploads"
-          ? "你还没有上传过照片"
-          : "这里还没有生成的造型") +
-        "</p><div>" +
-        button("虚拟试穿", "nav:3", "primary") +
-        " " +
-        button("寻找穿搭灵感", "nav:2") +
-        "</div>" +
-        (filter !== "All" ? button("查看全部", "filter:All", "minor") : "") +
-        "</div>")
+      : wardrobeEmpty()) + "</section>"
   );
 }
 function calendarView() {

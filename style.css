@@ -945,3 +945,35 @@ html {
 .auth-error:empty {display: none}
 
 .cloud-link { text-decoration: none; margin: 8px 0; }
+
+.wardrobe-home .seg { margin-bottom: 18px; }
+.wardrobe-tools { display: flex; justify-content: flex-end; }
+.wardrobe-tools .secondary { min-height: 40px; font-size: 14px; }
+.wardrobe-empty {
+  min-height: 0;
+  padding: clamp(24px, 5vh, 52px) 18px 36px;
+  gap: 24px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #f8f5ef, #fbfaf8 62%, #f5f3f1);
+}
+.wardrobe-example {
+  width: clamp(106px, 18vh, 152px);
+  position: relative;
+  margin: 5px 0;
+  padding: 5px;
+  background: white;
+  box-shadow: 0 6px 15px #40301918;
+  transform: rotate(-4deg);
+}
+.wardrobe-example img { display: block; width: 100%; aspect-ratio: 4/5; object-fit: cover; }
+.wardrobe-example figcaption { font-size: 11px; padding: 5px 0 2px; color: #66615c; text-align: center; }
+.wardrobe-intro h1 { font-size: clamp(23px, 5vw, 30px); line-height: 1.3; }
+.wardrobe-intro p { font-size: 14px; line-height: 1.65; font-weight: 400; color: #55565e; margin: 9px 0 18px; text-wrap: pretty; }
+.wardrobe-intro .primary { min-height: 44px; font-size: 15px; padding-inline: 24px; }
+@media (min-width: 800px) {
+  #shell:has(.wardrobe-home) { width: min(100%, 740px); }
+  .wardrobe-home .grid { grid-template-columns: repeat(3, 1fr); }
+  .wardrobe-empty { flex-direction: row; text-align: left; gap: 52px; padding: 46px 30px; }
+  .wardrobe-example { width: 152px; }
+  .wardrobe-intro { max-width: 275px; }
+}
