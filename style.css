@@ -977,3 +977,7 @@ html {
   .wardrobe-example { width: 152px; }
   .wardrobe-intro { max-width: 275px; }
 }
+
+.device-picker { position: relative; overflow: hidden; }
+.device-picker input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.device-picker:focus-within { outline: 3px solid #3686ff; outline-offset: 2px; }

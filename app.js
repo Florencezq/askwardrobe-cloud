@@ -92,7 +92,6 @@ let db = load(),
   marked = "",
   mode = "week",
   stepDate = dayKey(new Date()),
-  fileHandler = null,
   toastTimer;
 let drafts = {};
 let editingChoice = false;
@@ -418,6 +417,7 @@ function flowView() {
       "primary",
       valid ? "" : "disabled",
     ) +
+    (!first && isTry && (!cloud || account) ? devicePicker("garment", d.garment ? "从相册更换衣物" : "从相册选衣物", "secondary") : "") +
     (!first && isTry && cloud && db.items.some(i=>i.slot === "garment")
       ? button("从衣橱选择衣物","select:garment","secondary") : "") +
     (first || isTry
@@ -619,58 +619,69 @@ function profileView() {
 
   );
 }
-async function chooseFile(slot) {
-  close();
+function devicePicker(slot, text, style) {
+  return '<label class="device-picker ' + style + '">' + text +
+    '<input type="file" accept="image/*" data-photo-slot="' + slot +
+    '" aria-label="' + text + '"></label>';
+}
+function chooseFile(slot) {
   const input = el("file");
   input.value = "";
-  fileHandler = async (f) => {
-    if (!f) return;
-    if (
-      !["image/jpeg", "image/png", "image/webp"].includes(f.type) ||
-      f.size > 15 * 1024 * 1024
-    )
-      return notice("请选择不超过 15 MB 的 JPG、PNG 或 WebP 图片。");
-    let url = URL.createObjectURL(f);
-    try {
-      let im = new Image();
-      im.src = url;
-      await im.decode();
-      let scale = Math.min(1, 850 / Math.max(im.width, im.height));
-      let c = document.createElement("canvas");
-      c.width = Math.max(1, Math.round(im.width * scale));
-      c.height = Math.max(1, Math.round(im.height * scale));
-      let ctx = c.getContext("2d");
-      ctx.fillStyle = "white";
-      ctx.fillRect(0, 0, c.width, c.height);
-      ctx.drawImage(im, 0, 0, c.width, c.height);
-      let data = c.toDataURL("image/jpeg", 0.82);
-      if (slot === "wardrobe") {
-        const blob = await new Promise(resolve => c.toBlob(resolve,"image/jpeg",0.82));
-        if (!blob) return notice("图片读取失败，请再选一次。");
-        try {
-          await cloud.upload(account.id,blob);
-          filter = "Uploads";
-          await refreshGarments();
-          notice("已保存到云端衣橱");
-        } catch (error) { notice(error.message); }
-      } else if (slot === "avatar") {
-        if (!await commit((s) => (s.avatar = data))) return;
-        render();
-        editProfile();
-      } else {
-        draft()[slot] = data;
-        saveDraft();
-        render();
-      }
-    } catch {
-      notice("这张图片无法打开，请重新选一张。");
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  };
+  input.dataset.photoSlot = slot;
   input.click();
 }
-el("file").onchange = (e) => fileHandler?.(e.target.files[0]);
+document.addEventListener("change", (event) => {
+  const input = event.target;
+  if (!input.matches('input[type="file"][data-photo-slot]')) return;
+  const file = input.files[0];
+  if (!file) return;
+  input.value = "";
+  close();
+  readPhoto(input.dataset.photoSlot, file);
+});
+async function readPhoto(slot, f) {
+  if (f.size > 15 * 1024 * 1024) return notice("请选择不超过 15 MB 的图片。");
+  const imageType = f.type ? /^image\/(jpeg|png|webp|heic|heif|avif)$/i.test(f.type)
+    : /\.(jpe?g|png|webp|heic|heif|avif)$/i.test(f.name);
+  if (!imageType) return notice("请选择一张照片，例如 JPG、PNG 或 WebP 图片。");
+  let url = URL.createObjectURL(f);
+  try {
+    let im = new Image();
+    im.src = url;
+    await im.decode();
+    let scale = Math.min(1, 850 / Math.max(im.width, im.height));
+    let c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(im.width * scale));
+    c.height = Math.max(1, Math.round(im.height * scale));
+    let ctx = c.getContext("2d");
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(im, 0, 0, c.width, c.height);
+    let data = c.toDataURL("image/jpeg", 0.82);
+    if (slot === "wardrobe") {
+      const blob = await new Promise(resolve => c.toBlob(resolve,"image/jpeg",0.82));
+      if (!blob) return notice("图片读取失败，请再选一次。");
+      try {
+        await cloud.upload(account.id,blob);
+        filter = "Uploads";
+        await refreshGarments();
+        notice("已保存到云端衣橱");
+      } catch (error) { notice(error.message); }
+    } else if (slot === "avatar") {
+      if (!await commit((s) => (s.avatar = data))) return;
+      render();
+      editProfile();
+    } else {
+      draft()[slot] = data;
+      saveDraft();
+      render();
+    }
+  } catch {
+    notice("当前浏览器无法读取这张图。请将它导出为 JPG，或选择一张截图。");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 function selectPhoto(slot) {
   let items = db.items.filter((i) => i.type === "Uploads" && i.slot === slot);
   let list = items.length
@@ -688,8 +699,8 @@ function selectPhoto(slot) {
       (slot === "person"
         ? "请选择一张清晰的正面人物照。"
         : "请选择一张清晰的单件衣物图。") +
-      '支持 JPG、PNG、WebP，最大 15 MB。</p><div class="sheet-buttons">' +
-      button("从设备选择", "file:" + slot, "primary") +
+      '图片最大 15 MB。</p><div class="sheet-buttons">' +
+      devicePicker(slot, slot === "garment" ? "从相册选衣物" : "从相册选人物照", "primary") +
       button(
         slot === "person" ? "使用示例人物照" : "使用示例衣物图",
         "sample:" + slot,
