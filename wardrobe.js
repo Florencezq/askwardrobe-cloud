@@ -26,12 +26,21 @@ window.cloudWardrobe = (() => {
       if (files.length) {
         const {data:links,error:linkError}=await storage.createSignedUrls(files.map(file=>owner+'/'+file.name),3600);
         if (linkError) throw linkError;
+        const styles=new Map();
+        if (isLook) {
+          const ids=files.map(f=>f.name).filter(n=>/^[0-9a-f-]{36}\.jpg$/.test(n)).map(n=>n.slice(0,-4));
+          if (ids.length) {
+            const meta=await client.rpc("wardrobe_generated_styles",{p_ids:ids});
+            if (meta.error) throw meta.error;
+            for (const row of meta.data) styles.set(row.id,row.title);
+          }
+        }
         files.forEach((file,index)=>{
           if (!/^[0-9a-f-]{36}\.jpg$/.test(file.name)) return;
           const id=file.name.slice(0,-4),src='wardrobe:'+id;
           if (!links[index]?.signedUrl) throw Error('图片读取失败。');
           signed.set(src,links[index].signedUrl);
-          const detail=isLook ? {type:'Try On',engine:'openai',title:'虚拟试穿',parts:[]} : {type:'Uploads',slot:'garment',title:'衣物图'};
+          const detail=isLook ? {type:styles.has(id)?'Generator':'Try On',engine:'openai',title:styles.get(id)||'虚拟试穿',parts:[]} : {type:'Uploads',slot:'garment',title:'衣物图'};
           items.push({id,src,...detail,date:file.created_at.slice(0,10),created:file.created_at});
         });
       }
@@ -45,7 +54,7 @@ window.cloudWardrobe = (() => {
   }
   async function tryOnState() {
     const {data,error}=await client.rpc("wardrobe_tryon_state");
-    if (error) throw Error("试穿状态暂时无法读取。");
+    if (error) throw Error("生成状态暂时无法读取。");
     return data;
   }
   async function recoverTryOn(id) {
@@ -62,7 +71,18 @@ window.cloudWardrobe = (() => {
     const form=new FormData();
     form.set("id",job.id);
     form.set("person",await photo(job.person),"person");
-    for (const slot of ["garment","bottom","accessory","hat"]) {
+    if (job.type==="Generator") {
+      const assets=["suit","preppy","gothic","street","boho","future"];
+      const index=job.style===0 ? 1+Math.floor(Math.random()*assets.length) : job.style;
+      form.set("type","Generator");
+      form.set("style",String(index));
+      if (index===7) form.set("custom",job.custom);
+      else {
+        const reference=await fetch("assets/"+assets[index-1]+".webp");
+        if (!reference.ok) throw Object.assign(Error("无法读取风格图，请重新选择。"),{status:422});
+        form.set("reference",await reference.blob(),"style.webp");
+      }
+    } else for (const slot of ["garment","bottom","accessory","hat"]) {
       const src=job[slot];
       if (!src) continue;
       if (src.startsWith("wardrobe:")) form.set(slot+"Id",src.slice(9));

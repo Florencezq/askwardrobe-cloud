@@ -449,7 +449,7 @@ let jobMessage = "";
 let archiveBlocked = false;
 function waitView() {
   const job = db.job;
-  const refs = job.type === "Try On" ? selectedSlots(job).map(slot=>img(job[slot],outfitLabels[slot])).join("") : img(asset(styles[job.style][2]),"风格参考");
+  const refs = job.type === "Try On" ? selectedSlots(job).map(slot=>img(job[slot],outfitLabels[slot])).join("") : (styles[job.style] ? img(asset(styles[job.style][2]),"风格参考") : "");
   const pair = job.person && refs ? '<div class="pair">'+img(job.person,"人物照")+refs+'</div>' : '';
   return '<section class="wait">' + pair + '<p role="status">'  + esc(jobMessage || "正在提交造型…") + '</p>' +
     (archiveBlocked ? button("重试保存", "retry-save", "primary") : "") +
@@ -793,7 +793,7 @@ async function startJob() {
   const sourceTab = tab;
   let engine;
   try {
-    const config = cloud ? {tryOnEngine:"openai"} : await jobRequest("/api/config");
+    const config = cloud ? {tryOnEngine:"openai",engine:"openai"} : await jobRequest("/api/config");
     engine = tab === "Try On" ? config.tryOnEngine : config.engine;
   } catch {
     notice("暂时连不上生成服务，请稍后再试。");
@@ -811,7 +811,6 @@ async function startJob() {
     : reviewChoice("style", "穿搭风格", asset(style[2]), d.style === 7 ? d.custom.trim() : style[0]);
   const choices = '<div class="review-choices">' + reviewChoice("person", "人物照", d.person) + pairing + '</div>';
   if (!engine) {
-    if (cloud) return modal("生成服务尚未上线", choices + "<p>当前可在本机版生成上身图。</p>" + button("返回", "close", "primary wide"));
     modal("连接 AI 图像服务", choices +
       "<p>人物照和衣物选择已保留。在项目文件夹双击「配置试穿服务.command」，输入你的 OpenAI API 密钥，然后回到这里。</p>" +
       button("已配置，重新检查", "check-service", "primary wide"));
@@ -821,7 +820,7 @@ async function startJob() {
   if (cloud) {
     try { db.credit = (await cloud.tryOnState()).credit; }
     catch (error) { return notice(error.message); }
-    if (!db.credit) return modal("当前没有可用试穿次数","<p>可以在衣橱中查看已经保存的试穿图。</p>" + button("去衣橱","nav:0","primary wide"));
+    if (!db.credit) return modal("当前没有可用生成次数","<p>可以在衣橱中查看已经保存的试穿图。</p>" + button("去衣橱","nav:0","primary wide"));
   }
   if (!db.credit) {
     modal(
@@ -847,8 +846,8 @@ async function submitCloudJob(job) {
   if (!account || submittingCloud || db.job) return;
   submittingCloud = true;
   close();
-  sessionStorage.setItem(cloudPendingKey(),JSON.stringify({id:job.id,at:job.at}));
-  db.job = job; screen = "wait"; jobMessage = "正在提交试穿…"; render();
+  sessionStorage.setItem(cloudPendingKey(),JSON.stringify({id:job.id,at:job.at,type:job.type}));
+  db.job = job; screen = "wait"; jobMessage = "正在提交生成请求…"; render();
   try {
     await cloud.submitTryOn(job);
     db.credit = 0;
@@ -884,14 +883,14 @@ async function pollCloudJob() {
       if (!items.some(item=>item.id===job.id)) throw Error("正在读取成片。");
       cloudRead++;
       db.items = items;
-      db.job = null; sessionStorage.removeItem(cloudPendingKey()); forgetDraft("Try On");
+      db.job = null; sessionStorage.removeItem(cloudPendingKey()); forgetDraft(job.type);
       if (screen === "wait") openItem(job.id,"result");
-      else { render(); notice("试穿图已保存到衣橱"); }
+      else { render(); notice("造型已保存到衣橱"); }
       return;
     }
     if (row?.id !== job.id && job.at && Date.now()-job.at < 30000) return;
     db.job = null; screen = "home"; sessionStorage.removeItem(cloudPendingKey()); render();
-    notice(row?.id === job.id ? row.message || "试穿未完成，请重试。" : "未找到这次提交，请重新确认。");
+    notice(row?.id === job.id ? row.message || "生成未完成，请重试。" : "未找到这次提交，请重新确认。");
   } catch { setJobMessage("正在同步云端状态，恢复连接后会继续。"); }
   finally { pollingCloud = false; }
 }
@@ -1088,7 +1087,7 @@ async function act(action) {
           button("知道了", "close", "primary wide"),
       );
     case "sample":
-      if (cloud && !account && tab === "Try On") return accountForm(false);
+      if (cloud && !account && creatorTabs.includes(tab)) return accountForm(false);
       draft()[a] = a === "person" ? photos[0] : photos[1];
       saveDraft();
       close();
@@ -1097,7 +1096,7 @@ async function act(action) {
       if (!account) return accountForm(false);
       return chooseFile("wardrobe");
     case "select":
-      if (cloud && !account && tab === "Try On") return accountForm(false);
+      if (cloud && !account && creatorTabs.includes(tab)) return accountForm(false);
       return selectPhoto(a);
     case "file":
       return chooseFile(a);
@@ -1426,7 +1425,7 @@ async function cloudSnapshot() {
   const wardrobe = fresh();
   wardrobe.items = items;
   wardrobe.credit = state.credit;
-  if (state.latest?.state === "running") wardrobe.job = {id:state.latest.id,type:"Try On"};
+  if (state.latest?.state === "running") wardrobe.job = {id:state.latest.id,type:state.latest.type || "Try On"};
   if (profile) wardrobe.plans = profile.plans;
   if (profile) { wardrobe.name = profile.name; wardrobe.avatar = profile.avatar; }
   return {account:identity,wardrobe,revision:profile?.revision || 0};
@@ -1457,14 +1456,17 @@ async function initialize() {
   if (cloud && (location.hash === "#tryon" || sessionStorage.getItem("open-cloud-tryon"))) {
     tab = "Try On"; sessionStorage.removeItem("open-cloud-tryon");
   }
+  if (cloud && (location.hash === "#generator" || sessionStorage.getItem("open-cloud-generator"))) {
+    tab = "Generator"; sessionStorage.removeItem("open-cloud-generator");
+  }
   if (db.job) { tab = db.job.type; screen = "wait"; }
   render();
   if (cloud) {
     if (account && sessionStorage.getItem(cloudPendingKey())) {
       const pending = sessionStorage.getItem(cloudPendingKey());
       const ticket = pending.startsWith("{") ? JSON.parse(pending) : {id:pending};
-      db.job = {...ticket,type:"Try On",...drafts["Try On"]};
-      tab = "Try On"; screen = "wait"; render();
+      tab = ticket.type || db.job?.type || "Try On";
+      db.job = {...drafts[tab],...ticket,type:tab}; screen = "wait"; render();
     }
     if (db.job) jobMessage = "正在制作上身图，完成后会自动存入衣橱。";
     setInterval(()=>{ if (!document.hidden && db.job) pollCloudJob(); },3000);
@@ -1508,6 +1510,7 @@ function accountForm(register) {
       if (cloud) {
         await cloud.authenticate(register,data);
         if (tab === "Try On" && !["#register","#login"].includes(location.hash)) sessionStorage.setItem("open-cloud-tryon","1");
+        else if (tab === "Generator" && !["#register","#login"].includes(location.hash)) sessionStorage.setItem("open-cloud-generator","1");
         else sessionStorage.setItem("open-cloud-wardrobe","1");
       } else await jobRequest("/api/auth/"+(register ? "register" : "login"),{
         method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)
