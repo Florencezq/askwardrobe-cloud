@@ -732,6 +732,18 @@ h2 {
   border-bottom: 1px solid #756c60;
   font: italic 15px Georgia;
 }
+.nickname-edit {
+  width: 100%;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+}
+.nickname-edit small { flex: none; color: #244c78; font: 600 12px system-ui, sans-serif; }
 .license .seal {
   font: italic bold 16px Georgia;
   color: #fff;

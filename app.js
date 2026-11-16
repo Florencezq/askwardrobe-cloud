@@ -613,7 +613,7 @@ function profileView() {
   return (
     '<div class="license">' + devicePicker("avatar", action, "portrait", portrait) +
     '<div><h2 lang="en">Fashion<br><b>License</b></h2><dl><dt>昵称</dt><dd>' +
-    esc(db.name) +
+    button('<span>' + esc(db.name) + '</span><small>编辑</small>', "edit-nickname", "nickname-edit", 'aria-label="编辑昵称"') +
     '</dd><dt>身份</dt><dd>穿搭爱好者</dd></dl><span class="seal" lang="en">Try On</span></div></div><div class="bar">' +
     button("编辑资料", "edit-profile") +
     '</div>' +
@@ -730,6 +730,14 @@ function editProfile() {
       button("保存修改", "save-profile", "primary") +
       "</div>",
   );
+  const nick = el("nick");
+  nick.oninput = () => nick.setCustomValidity("");
+  nick.onkeydown = event => {
+    if (event.key === "Enter" && !event.isComposing && event.keyCode !== 229) {
+      event.preventDefault();
+      act("save-profile");
+    }
+  };
 }
 function menu(id) {
   const i = find(id);
@@ -1303,12 +1311,24 @@ async function act(action) {
           : dayKey(new Date(d.getFullYear(), d.getMonth() + Number(a), 1, 12));
       break;
     }
+    case "edit-nickname":
+      editProfile();
+      el("nick").focus();
+      el("nick").select();
+      return;
     case "edit-profile":
       return editProfile();
     case "save-profile": {
       let name = el("nick").value.trim();
-      if (!name) return notice("请输入昵称");
-      if (await commit((s) => (s.name = name))) close();
+      if (!name) {
+        el("nick").setCustomValidity("请输入昵称");
+        el("nick").reportValidity();
+        return;
+      }
+      if (await commit((s) => (s.name = name))) {
+        close();
+        notice("昵称已保存");
+      }
       break;
     }
     case "refill":
