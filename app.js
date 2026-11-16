@@ -616,9 +616,7 @@ function profileView() {
     '<div class="license">' + devicePicker("avatar", action, "portrait", portrait) +
     '<div><h2 lang="en">Fashion<br><b>License</b></h2><dl><dt>昵称</dt><dd>' +
     button('<span>' + esc(db.name) + '</span><small>编辑</small>', "edit-nickname", "nickname-edit", 'aria-label="编辑昵称"') +
-    '</dd><dt>身份</dt><dd>穿搭爱好者</dd></dl><span class="seal" lang="en">Try On</span></div></div><div class="bar">' +
-    button("编辑资料", "edit-profile") +
-    '</div>' +
+    '</dd><dt>身份</dt><dd>穿搭爱好者</dd></dl><span class="seal" lang="en">Try On</span></div></div>' +
     (cloud ? '<h3 class="section-name">账号</h3>' : '<a class="primary wide cloud-link" href="https://florencezq.github.io/askwardrobe-cloud/">打开云端衣橱</a>' +
     '<h3 class="section-name">本机账号</h3>') +
     (account ? '<div class="line">登录邮箱<span>' + esc(account.email) + '</span></div>' +
@@ -1339,8 +1337,6 @@ async function act(action) {
       el("nick").focus();
       el("nick").select();
       return;
-    case "edit-profile":
-      return editProfile();
     case "save-profile": {
       let name = el("nick").value.trim();
       if (!name) {
