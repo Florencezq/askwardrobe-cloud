@@ -607,10 +607,12 @@ function calendarView() {
   );
 }
 function profileView() {
+  const action = db.avatar ? "更换头像" : "上传头像";
+  const portrait = (db.avatar ? img(db.avatar, "个人头像") : esc(db.name.slice(0, 1))) +
+    '<span class="portrait-caption">' + action + '</span>';
   return (
-    '<div class="license"><div class="portrait">' +
-    (db.avatar ? img(db.avatar, "个人头像") : esc(db.name.slice(0, 1))) +
-    '</div><div><h2 lang="en">Fashion<br><b>License</b></h2><dl><dt>昵称</dt><dd>' +
+    '<div class="license">' + devicePicker("avatar", action, "portrait", portrait) +
+    '<div><h2 lang="en">Fashion<br><b>License</b></h2><dl><dt>昵称</dt><dd>' +
     esc(db.name) +
     '</dd><dt>身份</dt><dd>穿搭爱好者</dd></dl><span class="seal" lang="en">Try On</span></div></div><div class="bar">' +
     button("编辑资料", "edit-profile") +
@@ -629,10 +631,10 @@ function profileView() {
 
   );
 }
-function devicePicker(slot, text, style) {
-  return '<label class="device-picker ' + style + '">' + text +
+function devicePicker(slot, text, style, content = esc(text)) {
+  return '<label class="device-picker ' + style + '">' + content +
     '<input type="file" accept="image/*" data-photo-slot="' + slot +
-    '" aria-label="' + text + '"></label>';
+    '" aria-label="' + esc(text) + '"></label>';
 }
 function chooseFile(slot) {
   const input = el("file");
@@ -646,7 +648,7 @@ document.addEventListener("change", (event) => {
   const file = input.files[0];
   if (!file) return;
   input.value = "";
-  close();
+  if (input.dataset.photoSlot !== "avatar") close();
   readPhoto(input.dataset.photoSlot, file);
 });
 async function readPhoto(slot, f) {
@@ -680,7 +682,7 @@ async function readPhoto(slot, f) {
     } else if (slot === "avatar") {
       if (!await commit((s) => (s.avatar = data))) return;
       render();
-      editProfile();
+      notice("头像已保存");
     } else {
       draft()[slot] = data;
       saveDraft();
@@ -721,7 +723,7 @@ function selectPhoto(slot) {
 function editProfile() {
   modal(
     "编辑资料",
-    button("更换头像", "file:avatar") +
+    devicePicker("avatar", "更换头像", "secondary") +
       '<label for="nick">昵称</label><input class="text-input" id="nick" maxlength="40" value="' +
       esc(db.name) +
       '"><div class="bar">' +
