@@ -95,6 +95,9 @@ let db = load(),
   toastTimer;
 let drafts = {};
 let editingChoice = false;
+const outfitLabels = {garment:"上装", bottom:"下装", accessory:"配饰", hat:"帽子"};
+const outfitSlots = Object.keys(outfitLabels);
+const selectedSlots = data => outfitSlots.filter(slot => data[slot]);
 const creatorTabs = ["Try On", "Generator"];
 const draftKey = (type) => key + "-draft-" + type;
 const draftTabKey = () => key + "-draft-tab";
@@ -363,7 +366,7 @@ function flowView() {
   const d = draft(),
     first = d.step === 1,
     isTry = tab === "Try On";
-  let slot = first ? "person" : "garment",
+  let slot = first ? "person" : (d.activeSlot || "garment"),
     isStyle = !first && !isTry,
     style = styles[d.style];
   let title = first
@@ -371,7 +374,7 @@ function flowView() {
       ? "看看衣服<br>穿上身的样子"
       : "找到适合你的<br>穿搭风格"
     : isTry
-      ? "想试穿<br>哪件衣服？"
+      ? "想怎么搭配？"
       : "选一种<br>穿搭风格";
   let card = isStyle
     ? '<div class="style-wrap"><div class="style-card" tabindex="0" role="group" aria-label="' +
@@ -382,7 +385,14 @@ function flowView() {
       "</strong><p>" +
       style[1] +
       "</p></div></div></div>"
-    : photoCard(slot, d[slot]);
+    : !first && isTry
+      ? '<div class="outfit-grid">' + outfitSlots.map(key =>
+          button((d[key] ? img(d[key], outfitLabels[key]) : '<span class="outfit-plus" aria-hidden="true">＋</span>') +
+            '<strong>'+outfitLabels[key]+'</strong>', "select:"+key,
+            key === slot ? "outfit-tile chosen" : "outfit-tile",
+            'aria-label="选择'+outfitLabels[key]+'"')
+        ).join("") + '</div>'
+      : photoCard(slot, d[slot]);
   let controls = isStyle
     ? '<div class="style-switch">' +
       button("‹", "style:-1", "", 'aria-label="上一个风格"') +
@@ -402,7 +412,7 @@ function flowView() {
   let valid = first
     ? d.person
     : isTry
-      ? d.garment
+      ? selectedSlots(d).length
       : d.style !== 7 || d.custom.trim();
   return (
     '<div class="flow"><h1>' +
@@ -417,10 +427,10 @@ function flowView() {
       "primary",
       valid ? "" : "disabled",
     ) +
-    (!first && isTry && (!cloud || account) ? devicePicker("garment", d.garment ? "从相册更换衣物" : "从相册选衣物", "secondary") : "") +
+    (!first && isTry && (!cloud || account) ? devicePicker(slot, "从相册"+(d[slot] ? "更换" : "选")+outfitLabels[slot], "secondary") : "") +
     (!first && isTry && cloud && db.items.some(i=>i.slot === "garment")
-      ? button("从衣橱选择衣物","select:garment","secondary") : "") +
-    (first || isTry
+      ? button("从衣橱选择衣物","select:"+slot,"secondary") : "") +
+    (first || (isTry && slot === "garment")
       ? button(
           first ? "使用示例人物照" : "使用示例衣物图",
           "sample:" + slot,
@@ -439,8 +449,8 @@ let jobMessage = "";
 let archiveBlocked = false;
 function waitView() {
   const job = db.job;
-  const pairing = job.type === "Try On" ? job.garment : asset(styles[job.style][2]);
-  const pair = job.person && pairing ? '<div class="pair">' + img(job.person,"人物照") + img(pairing,job.type === "Try On" ? "衣物图" : "风格参考") + '</div>' : '';
+  const refs = job.type === "Try On" ? selectedSlots(job).map(slot=>img(job[slot],outfitLabels[slot])).join("") : img(asset(styles[job.style][2]),"风格参考");
+  const pair = job.person && refs ? '<div class="pair">'+img(job.person,"人物照")+refs+'</div>' : '';
   return '<section class="wait">' + pair + '<p role="status">'  + esc(jobMessage || "正在提交造型…") + '</p>' +
     (archiveBlocked ? button("重试保存", "retry-save", "primary") : "") +
     button("去衣橱", "nav:0", "secondary") + "</section>";
@@ -683,7 +693,8 @@ async function readPhoto(slot, f) {
   }
 }
 function selectPhoto(slot) {
-  let items = db.items.filter((i) => i.type === "Uploads" && i.slot === slot);
+  if (outfitSlots.includes(slot)) { draft().activeSlot = slot; saveDraft(); render(); }
+  let items = db.items.filter(i => i.type === "Uploads" && (slot === "person" ? i.slot === slot : outfitSlots.includes(i.slot)));
   let list = items.length
     ? '<h3>从衣橱中选择</h3><div class="mini-grid">' +
       items
@@ -694,17 +705,15 @@ function selectPhoto(slot) {
       "</div>"
     : "";
   modal(
-    slot === "person" ? "人物照" : "衣物图",
+    slot === "person" ? "人物照" : outfitLabels[slot],
     "<p>" +
       (slot === "person"
         ? "请选择一张清晰的正面人物照。"
         : "请选择一张清晰的单件衣物图。") +
       '图片最大 15 MB。</p><div class="sheet-buttons">' +
-      devicePicker(slot, slot === "garment" ? "从相册选衣物" : "从相册选人物照", "primary") +
-      button(
-        slot === "person" ? "使用示例人物照" : "使用示例衣物图",
-        "sample:" + slot,
-      ) +
+      devicePicker(slot, "从相册选"+(outfitLabels[slot] || "人物照"), "primary") +
+      (["person","garment"].includes(slot) ? button(slot === "person" ? "使用示例人物照" : "使用示例衣物图", "sample:" + slot) : "") +
+      (outfitSlots.includes(slot) && draft()[slot] ? button("移除"+outfitLabels[slot], "remove-choice:"+slot) : "") +
       "</div>" +
       list,
   );
@@ -770,7 +779,7 @@ async function startJob() {
   if (
     !d.person ||
     d.step !== 2 ||
-    (!d.garment && tab === "Try On") ||
+    (!selectedSlots(d).length && tab === "Try On") ||
     (tab === "Generator" && d.style === 7 && !d.custom.trim())
   )
     return;
@@ -798,7 +807,7 @@ async function startJob() {
     el("page").querySelector('[data-action="generate"]').focus();
   }
   const pairing = tab === "Try On"
-    ? reviewChoice("garment", "衣物图", d.garment)
+    ? selectedSlots(d).map(slot => reviewChoice(slot, outfitLabels[slot], d[slot])).join("")
     : reviewChoice("style", "穿搭风格", asset(style[2]), d.style === 7 ? d.custom.trim() : style[0]);
   const choices = '<div class="review-choices">' + reviewChoice("person", "人物照", d.person) + pairing + '</div>';
   if (!engine) {
@@ -940,7 +949,7 @@ function setJobMessage(message) {
 async function failJob(job, message) {
   if (!await commit(s => { s.job = null; s.credit += 1; })) return;
   tab = job.type;
-  drafts[tab] = {person: job.person, garment: job.garment, style: job.style, custom: job.custom, step: 2};
+  drafts[tab] = {person:job.person, ...Object.fromEntries(outfitSlots.map(slot=>[slot,job[slot] || ""])), style:job.style, custom:job.custom, step:2};
   saveDraft();
   screen = "home";
   render();
@@ -965,7 +974,7 @@ async function settle() {
     } catch (error) {
       if (error.status !== 404 || job.accepted) throw error;
       result = await jobRequest(path, {method: "PUT", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({engine:job.engine,type:job.type,person:job.person,garment:job.garment,style:job.style,custom:job.custom})});
+        body: JSON.stringify({engine:job.engine,type:job.type,person:job.person,garment:job.garment,bottom:job.bottom,accessory:job.accessory,hat:job.hat,style:job.style,custom:job.custom})});
     }
     await reconcileJob(job, async () => {
       if (result.state === "failed" || result.state === "archived") {
@@ -996,7 +1005,7 @@ async function finishJob(j, result) {
   let toResult = screen === "wait",
     saved = await commit((s) => {
       let parts = [];
-      for (let slot of ["person", "garment"]) {
+      for (let slot of ["person", ...outfitSlots]) {
         if (!j[slot]) continue;
         let source = s.items.find(
           (i) => i.type === "Uploads" && i.slot === slot && i.src === j[slot],
@@ -1007,7 +1016,7 @@ async function finishJob(j, result) {
             type: "Uploads",
             slot,
             src: j[slot],
-            title: slot === "person" ? "人物照" : "衣物图",
+            title: slot === "person" ? "人物照" : outfitLabels[slot],
             date: dayKey(new Date()),
           };
           s.items.unshift(source);
@@ -1092,6 +1101,8 @@ async function act(action) {
       return selectPhoto(a);
     case "file":
       return chooseFile(a);
+    case "remove-choice":
+      draft()[a] = ""; saveDraft(); close(); break;
     case "pick":
       draft()[a] = find(b).src;
       saveDraft();
@@ -1191,10 +1202,10 @@ async function act(action) {
       const previous = find(a);
       const sources = previous.parts.map(find).filter(Boolean);
       const person = sources.find(i => i.slot === "person");
-      const garment = sources.find(i => i.slot === "garment");
-      if (!person || !garment) return notice("原始素材已删除，请重新选择。");
+      const items = sources.filter(i => outfitSlots.includes(i.slot));
+      if (!person || !items.length || sources.length !== previous.parts.length) return notice("原始素材已删除，请重新选择。");
       go("Try On");
-      Object.assign(draft(), {person: person.src, garment: garment.src, step: 2});
+      Object.assign(draft(), Object.fromEntries(outfitSlots.map(slot=>[slot,items.find(i=>i.slot===slot)?.src || ""])), {person:person.src, activeSlot:items[0].slot, step:2});
       saveDraft();
       render();
       return startJob();
@@ -1203,7 +1214,8 @@ async function act(action) {
       let i = find(a);
       go("Try On");
       draft()[i.slot] = i.src;
-      draft().step = i.slot === "garment" && draft().person ? 2 : 1;
+      if (outfitSlots.includes(i.slot)) draft().activeSlot = i.slot;
+      draft().step = outfitSlots.includes(i.slot) && draft().person ? 2 : 1;
       saveDraft();
       break;
     }

@@ -62,8 +62,12 @@ window.cloudWardrobe = (() => {
     const form=new FormData();
     form.set("id",job.id);
     form.set("person",await photo(job.person),"person");
-    if (job.garment.startsWith("wardrobe:")) form.set("garmentId",job.garment.slice(9));
-    else form.set("garment",await photo(job.garment),"garment");
+    for (const slot of ["garment","bottom","accessory","hat"]) {
+      const src=job[slot];
+      if (!src) continue;
+      if (src.startsWith("wardrobe:")) form.set(slot+"Id",src.slice(9));
+      else form.set(slot,await photo(src),slot);
+    }
     const {error}=await client.functions.invoke("wardrobe-tryon",{body:form});
     if (error) {
       const response=error.context;
