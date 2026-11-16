@@ -4,7 +4,7 @@ const photos = ["person", "jacket", "street", "suit", "preppy", "boho"].map(
   asset,
 );
 const styles = [
-  ["帮我挑一套", "为你挑一套意想不到的穿搭。", "cloud", "suit"],
+  ["帮我挑一套", "从 6 种预设风格中随机选一种，为你搭配一套。", "cloud", "suit"],
   ["极简风", "利落的线条，柔和的中性色。", "suit", "suit"],
   ["现代学院风", "衬衫与百褶裙，穿出清爽的学院感。", "preppy", "preppy"],
   ["哥特浪漫", "深色调搭配蕾丝细节。", "gothic", "gothic"],
@@ -49,6 +49,7 @@ const esc = (v) =>
   );
 const el = (id) => document.getElementById(id);
 const tabs = ["Wardrobe", "Calendar", "Generator", "Try On", "Profile"];
+const tabRoutes = {Wardrobe:"#wardrobe", Calendar:"#calendar", Generator:"#generator", "Try On":"#tryon", Profile:"#account"};
 const labels = {Wardrobe:"衣橱", Calendar:"日历", Generator:"穿搭生成", "Try On":"试穿", Profile:"我的", All:"全部", Uploads:"已上传"};
 const cloud = window.cloudWardrobe;
 const guestKey = "wardrobe-studio-prototype-v1";
@@ -257,6 +258,7 @@ function go(t) {
   close();
   editingChoice = false;
   tab = t;
+  history.replaceState(null, "", tabRoutes[t]);
   rememberDraftTab(t);
   screen = "home";
   marked = "";
@@ -626,7 +628,7 @@ function profileView() {
       button("删除本地资料", "delete-account", "line")) +
     '<h3 class="section-name">我的方案</h3><div class="line"><b>免费体验</b></div><div class="line"><b>剩余生成次数</b><span>' +
     db.credit +
-    " / 1 次</span></div>" +
+    " 次</span></div>" +
     (cloud ? "" : button("重置体验次数", "refill", "line"))
 
   );
@@ -818,7 +820,7 @@ async function startJob() {
   }
   const pairing = tab === "Try On"
     ? selectedSlots(d).map(slot => reviewChoice(slot, outfitLabels[slot], d[slot])).join("")
-    : reviewChoice("style", "穿搭风格", asset(style[2]), d.style === 7 ? d.custom.trim() : style[0]);
+    : reviewChoice("style", "穿搭风格", asset(style[2]), d.style === 7 ? d.custom.trim() : d.style === 0 ? "帮我挑一套（从 6 种风格中随机选）" : style[0]);
   const choices = '<div class="review-choices">' + reviewChoice("person", "人物照", d.person) + pairing + '</div>';
   if (!engine) {
     modal("连接 AI 图像服务", choices +
@@ -1065,8 +1067,19 @@ async function finishJob(j, result) {
 async function deleteItem(id) {
   if (cloud && account) {
     try {
-      await cloud.remove(account.id,id,find(id)?.type === "Try On");
+      const item = find(id);
+      if (!item) return;
+      await cloud.remove(account.id,id,item.type !== "Uploads");
+      db.items = db.items.filter(i => i.id !== id);
+      for (const date of Object.keys(db.plans)) if (db.plans[date] === id) delete db.plans[date];
       go("Wardrobe");
+      if (item.type !== "Uploads") {
+        const current = await cloud.profile(account.id);
+        if (current && current.revision >= revision) {
+          Object.assign(db, {plans:current.plans, name:current.name, avatar:current.avatar});
+          revision = current.revision;
+        }
+      }
       return notice("已从衣橱移除");
     } catch (error) { return notice(error.message); }
   }
@@ -1220,11 +1233,21 @@ async function act(action) {
       return startJob();
     }
     case "reuse": {
-      let i = find(a);
+      const item = find(a);
+      if (!item) return;
+      if (item.slot !== "person") {
+        return modal("这件单品用在哪里？", '<div class="sheet-buttons">' +
+          outfitSlots.map(slot => button(outfitLabels[slot], "reuse-as:"+a+":"+slot)).join("") + "</div>");
+      }
+      return act("reuse-as:"+a+":person");
+    }
+    case "reuse-as": {
+      const item = find(a);
+      if (!item || (b !== "person" && !outfitSlots.includes(b))) return;
       go("Try On");
-      draft()[i.slot] = i.src;
-      if (outfitSlots.includes(i.slot)) draft().activeSlot = i.slot;
-      draft().step = outfitSlots.includes(i.slot) && draft().person ? 2 : 1;
+      draft()[b] = item.src;
+      if (b !== "person") draft().activeSlot = b;
+      draft().step = b !== "person" && draft().person ? 2 : 1;
       saveDraft();
       break;
     }
@@ -1467,21 +1490,24 @@ async function initialize() {
   }
   if (db.signed) restoreDrafts();
   else clearDrafts();
-  if (location.hash === "#account" || sessionStorage.getItem("wardrobe-open-profile")) {
+  const routeTab = tabs.find(t => tabRoutes[t] === location.hash);
+  if (routeTab) tab = routeTab;
+  if (sessionStorage.getItem("wardrobe-open-profile")) {
     tab = "Profile";
     sessionStorage.removeItem("wardrobe-open-profile");
   }
-  if (cloud && (location.hash === "#wardrobe" || sessionStorage.getItem("open-cloud-wardrobe"))) {
+  if (cloud && sessionStorage.getItem("open-cloud-wardrobe")) {
     tab = "Wardrobe";
     sessionStorage.removeItem("open-cloud-wardrobe");
   }
-  if (cloud && (location.hash === "#tryon" || sessionStorage.getItem("open-cloud-tryon"))) {
+  if (cloud && sessionStorage.getItem("open-cloud-tryon")) {
     tab = "Try On"; sessionStorage.removeItem("open-cloud-tryon");
   }
-  if (cloud && (location.hash === "#generator" || sessionStorage.getItem("open-cloud-generator"))) {
+  if (cloud && sessionStorage.getItem("open-cloud-generator")) {
     tab = "Generator"; sessionStorage.removeItem("open-cloud-generator");
   }
   if (db.job) { tab = db.job.type; screen = "wait"; }
+  if (!["#login","#register"].includes(location.hash)) history.replaceState(null, "", tabRoutes[tab]);
   render();
   if (cloud) {
     if (account && sessionStorage.getItem(cloudPendingKey())) {

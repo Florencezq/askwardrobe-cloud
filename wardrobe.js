@@ -41,7 +41,7 @@ window.cloudWardrobe = (() => {
           if (!links[index]?.signedUrl) throw Error('图片读取失败。');
           signed.set(src,links[index].signedUrl);
           const detail=isLook ? {type:styles.has(id)?'Generator':'Try On',engine:'openai',title:styles.get(id)||'虚拟试穿',parts:[]} : {type:'Uploads',slot:'garment',title:'衣物图'};
-          items.push({id,src,...detail,date:file.created_at.slice(0,10),created:file.created_at});
+          items.push({id,src,...detail,date:dayKey(new Date(file.created_at)),created:file.created_at});
         });
       }
       if (files.length<100) break;
